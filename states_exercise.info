@@ -1,0 +1,5 @@
+; $Id$
+name = #states Exercise module
+description = Demonstrate lots of permutations of #states
+core = 7.x
+files[] = states_exercise.module

@@ -1,0 +1,148 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * Demonstrate as many #states features as possible.
+ */
+
+function states_exercise_menu() {
+
+  $items['states-exercise'] = array(
+    'title' => '#states: Comprehensive exercise routine',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('states_exercise_exhaustive_states'),
+    'access callback' => TRUE,
+  );
+
+  return $items;
+}
+
+/**
+ * Attempt to demonstrate most permutations of #states.
+ *
+ * This hopes to become a complete and exhaustive click-and-test suite.
+ */
+function states_exercise_exhaustive_states($form, &$form_state) {
+
+  $states['checkbox'] = array('enabled', 'disabled', 'visible', 'invisible', 'checked', 'unchecked', 'touched', 'untouched', 'expanded', 'collapsed');
+  $states['textfield'] = array('enabled', 'disabled', 'visible', 'invisible', 'checked', 'unchecked', 'visible', 'invisible', 'filled', 'empty', 'expanded', 'collapsed', 'required', 'optional', 'touched', 'untouched', 'readwrite', 'readonly');
+  $states['fieldset'] = array('expanded', 'collapsed', 'visible', 'invisible');
+  // Must also handle 'value'
+
+  $form['#tree'] = TRUE;
+
+  foreach ($states as $element_type => $state_list) {
+    foreach ($state_list as $state) {
+      $form[$element_type][$state] = array(
+        '#type' => 'fieldset',
+        '#title' => t('%state (@element_type)', array('%state' => $state, '@element_type' => $element_type)),
+      );
+      // These states we can't apply manually, so use checkbox to apply them.
+      if (in_array($state, array('visible', 'invisible', 'enabled', 'disabled', 'required', 'optional', 'readwrite', 'readonly'))) {
+        $form[$element_type][$state]['driver'] = array(
+          '#type' => 'checkbox',
+          '#title'  => t('Driver: Click this to apply the initial state %state to the trigger form element', array('%state' => $state)),
+        );
+      }
+      $form[$element_type][$state]['trigger'] = array(
+        '#type' => $element_type,
+        '#title' => t('Trigger: You can change this manually, or gets state %state when driver checkbox is checked', array('%state' => $state)),
+        '#states' => array(
+          $state => array(
+            ":input[name='{$element_type}[{$state}][driver]']" => array('checked' => TRUE),
+          ),
+        ),
+      );
+      if ($element_type == 'fieldset') {
+        $form[$element_type][$state]['trigger']['#collapsible'] = TRUE;
+      }
+      foreach ($state_list as $substate) {
+        switch ($substate) {
+          case 'checked':
+          case 'unchecked':
+            $dependent_element_type = 'checkbox';
+            break;
+          case 'expanded':
+          case 'collapsed':
+            $dependent_element_type = 'fieldset';
+            break;
+          default:
+            $dependent_element_type = 'textfield';
+            break;
+        }
+        $form[$element_type][$state][$substate] = array(
+          '#type' => $dependent_element_type,
+          '#title' => t('%substate when trigger element is %state', array('%state' => $state, '%substate' => $substate)),
+          '#states' => array(
+            $substate => array(
+              ":input[name='{$element_type}[{$state}][trigger]']" => array($state => TRUE),
+            ),
+          ),
+        );
+        if ($dependent_element_type == 'fieldset') {
+          $form[$element_type][$state][$substate]['#collapsible'] = TRUE;
+        }
+      }
+    }
+  }
+
+  // Test simple checkbox driving a fieldset expanded/collapsed.
+  $form['trigger_expand'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Click to expand the fieldset'),
+  );
+  $form['test_fieldset'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Fieldset should be expanded when checkbox is clicked'),
+    '#collapsible' => TRUE,
+    '#states' => array(
+      'expanded' => array(
+        ':input[name="trigger_expand"]' => array('checked' => TRUE),
+      ),
+    ),
+  );
+  // and another element dependent on the collapsed state of the test_fieldset.
+  $form['fieldset_driven_checkbox'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('A checkbox driven by expanded/collapsed of the fieldset'),
+    '#state' => array(
+      'checked' => array(
+        ':input[name="test_fieldset"]' => array('expanded' => TRUE),
+      ),
+    ),
+  );
+
+  // Test selects driving other elements.
+  $form['select_driver'] = array(
+    '#type' => 'select',
+    '#title' => t('Select to drive a textfield'),
+    '#options' => array("1" => t('One'), "2" => t('Two'), "3" => t('Three'))
+  );
+  $form['textfield_hidden_by_select'] = array(
+    '#type' => 'textfield',
+    '#title' => t('This should be hidden when select is set to 2'),
+    '#states' => array(
+      'invisible' => array(
+        ':input[name=select_driver]' => array('value' => "2"),
+      ),
+    ),
+  );
+  // Test radios driving other elements.
+  $form['radio_driver'] = array(
+    '#type' => 'radios',
+    '#title' => t('Radios to drive a textfield'),
+    '#options' => array("1" => t('One'), "2" => t('Two'), "3" => t('Three'))
+  );
+  $form['textfield_hidden_by_radio'] = array(
+    '#type' => 'textfield',
+    '#title' => t('This should be hidden when radio is set to 2'),
+    '#states' => array(
+      'invisible' => array(
+        ':input[name=radio_driver]' => array('value' => "2"),
+      ),
+    ),
+  );
+
+  return $form;
+}
